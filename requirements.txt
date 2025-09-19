@@ -1,0 +1,209 @@
+contourpy==1.0.7
+
+# 数据导出系统依赖包
+# Data Export System Dependencies
+
+# 核心框架
+Flask==2.3.3
+Flask-CORS==4.0.0
+
+# 数据库相关
+SQLAlchemy==2.0.23
+PyMySQL==1.1.0
+alembic==1.12.1
+
+# 数据处理
+pandas==2.1.4
+numpy==1.26.4
+openpyxl==3.1.2
+xlsxwriter==3.1.9
+
+# 任务调度
+APScheduler==3.10.4
+python-daemon==3.1.2
+
+# 日志记录
+loguru==0.7.2
+
+# 配置管理
+PyYAML==6.0.1
+
+# 加密工具
+cryptography==41.0.7
+PyJWT==2.10.1
+
+# HTTP请求
+requests==2.31.0
+
+# 邮件发送
+secure-smtplib==0.1.1
+
+# 钉钉机器人
+DingtalkChatbot==1.5.7
+
+# 时间处理
+python-dateutil==2.8.2
+
+# 类型检查
+typing-extensions==4.8.0
+
+# 开发工具
+pytest==7.4.3
+pytest-cov==4.1.0
+flake8==6.1.0
+black==23.11.0
+
+# 系统工具
+psutil==5.9.6
+click==8.1.7
+
+# JSON处理
+orjson==3.9.10
+
+# 环境变量
+python-dotenv==1.0.0
+
+# 守护进程
+#python-daemon==3.0.1
+
+# 网络工具
+urllib3==2.1.0
+certifi==2023.11.17
+
+# 时区处理
+pytz==2023.3
+
+# 文件处理
+chardet==5.2.0
+
+# 数据验证
+marshmallow==3.20.1
+
+# 缓存
+cachetools==5.3.2
+
+# 进度条
+tqdm==4.66.1
+
+# 配置解析
+configparser==6.0.0
+
+# 正则表达式增强
+regex==2023.10.3
+
+# 系统信息
+distro==1.8.0
+
+# 文件监控
+watchdog==3.0.0
+
+# 内存优化
+memory-profiler==0.61.0
+
+# 异步支持
+aiofiles==23.2.1
+
+# 数据序列化
+pickle-mixin==1.0.2
+
+# 文本处理
+jieba==0.42.1
+
+# 图像处理（可选）
+Pillow==10.1.0
+
+# 科学计算（可选）
+scipy==1.11.4
+
+# 机器学习（可选）
+scikit-learn==1.3.2
+
+# 可视化（可选）
+matplotlib==3.8.2
+seaborn==0.13.0
+
+# 网络爬虫（可选）
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# 数据库驱动扩展
+cx-Oracle==8.3.0
+psycopg2-binary==2.9.9
+pymongo==4.6.0
+redis==5.0.1
+
+# API文档
+flasgger==0.9.7.1
+
+# 性能监控
+py-spy==0.3.14
+
+# 文档生成
+sphinx==7.2.6
+
+# 代码质量
+pylint==3.0.3
+mypy==1.7.1
+
+# 安全扫描
+bandit==1.7.5
+
+# 依赖管理
+pipreqs==0.4.13
+pip-tools==7.3.0
+
+# 虚拟环境
+virtualenv==20.25.0
+
+# 包管理
+setuptools==69.0.2
+wheel==0.42.0
+
+# 分发工具
+twine==4.0.2
+
+# 版本管理
+bump2version==1.0.1
+
+# 持续集成
+coverage==7.3.2
+
+# 性能测试
+locust==2.17.0
+
+# 代码格式化
+autopep8==2.0.4
+isort==5.12.0
+
+# 导入排序
+#import-order==0.0.1
+
+# 代码复杂度
+radon==6.0.1
+
+# 安全检查
+safety==3.0.0
+
+# 许可证检查
+licensecheck==2023.1.1
+
+# 依赖树
+pipdeptree==2.13.1
+
+# 调试工具
+ipdb==0.13.13
+
+# 网络接口
+netifaces==0.11.0
+
+# 序列化
+dill==0.3.7
+
+# 装饰器
+decorator==5.1.1
+
+# 插件系统
+pluggy==1.3.0
+
+# 消息队列
+celery==5.3.4

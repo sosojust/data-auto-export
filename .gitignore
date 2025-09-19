@@ -1,0 +1,318 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+#   For a library or package, you might want to ignore these files since the code is
+#   intended to run in multiple environments; otherwise, check them in:
+# .python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# poetry
+#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
+#   This is especially recommended for binary packages to ensure reproducibility, and is more
+#   commonly ignored for libraries.
+#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
+#poetry.lock
+
+# pdm
+#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
+#pdm.lock
+#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
+#   in version control.
+#   https://pdm.fming.dev/#use-with-ide
+.pdm.toml
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+#  be added to the global gitignore or merged into this project gitignore.  For a PyCharm
+#  project, it is recommended to ignore the entire .idea directory.
+.idea/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+
+# Project specific
+# 日志文件
+logs/
+*.log
+
+# 导出文件
+exports/
+*.xlsx
+*.xls
+*.csv
+
+# 临时文件
+temp/
+tmp/
+*.tmp
+
+# 数据文件
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# 配置文件（包含敏感信息）
+config.yaml
+config.yml
+*.env
+.env.*
+
+# 加密密钥
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# 备份文件
+*.bak
+*.backup
+*.old
+
+# 系统生成的文件
+~$*
+.~*
+
+# 测试文件
+test_*.py
+*_test.py
+tests/
+
+# 文档生成
+docs/_build/
+docs/build/
+
+# 本地开发配置
+local_config.py
+local_settings.py
+development.yaml
+
+# 依赖管理
+requirements-dev.txt
+requirements-local.txt
+
+# 运行时文件
+*.pid
+*.sock
+
+# 缓存文件
+.cache/
+cache/
+
+# 编辑器临时文件
+*.swp
+*.swo
+*~
+.#*
+#*#
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Frontend build artifacts
+# Node.js dependencies
+web/frontend/node_modules/
+node_modules/
+
+# Build output
+web/frontend/dist/
+web/frontend/build/
+
+# Vite cache
+web/frontend/.vite/
+
+# TypeScript cache
+web/frontend/.tsbuildinfo
+
+# Package manager lock files (optional, depends on team preference)
+# web/frontend/package-lock.json
+# web/frontend/yarn.lock
+# web/frontend/pnpm-lock.yaml
+
+# Environment variables for frontend
+web/frontend/.env
+web/frontend/.env.local
+web/frontend/.env.development.local
+web/frontend/.env.test.local
+web/frontend/.env.production.local
+
+# Current frontend structure environment variables
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Editor directories and files
+web/frontend/.vscode/*
+!web/frontend/.vscode/extensions.json
+web/frontend/.idea
+web/frontend/*.suo
+web/frontend/*.ntvs*
+web/frontend/*.njsproj
+web/frontend/*.sln
+web/frontend/*.sw?
+
+# OS generated files in frontend
+web/frontend/.DS_Store
+web/frontend/.DS_Store?
+web/frontend/._*
+web/frontend/.Spotlight-V100
+web/frontend/.Trashes
+web/frontend/ehthumbs.db
+web/frontend/Thumbs.db

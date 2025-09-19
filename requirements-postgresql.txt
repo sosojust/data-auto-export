@@ -1,0 +1,15 @@
+# PostgreSQL可选依赖
+# 如果需要PostgreSQL支持，请运行: pip install -r requirements-postgresql.txt
+
+# PostgreSQL数据库驱动
+psycopg2-binary==2.9.7
+
+# 或者如果编译有问题，可以尝试:
+# psycopg2==2.9.7
+
+# macOS用户如果遇到编译问题，请先安装PostgreSQL:
+# brew install postgresql
+# 然后再安装: pip install psycopg2-binary
+
+# 或者使用conda安装:
+# conda install psycopg2

@@ -27,6 +27,7 @@ from core.services.data_export_service import DataExportService
 from core.models.task import ExportTask, TaskStatus, ExecutionType
 from core.models.data_source import DataSource
 from core.models.execution_log import ExecutionLog
+from core.models.resource import Resource
 from core.utils.config_manager import ConfigManager
 
 app = Flask(__name__)
@@ -45,7 +46,8 @@ SCHEDULER_CALLBACK_TIMEOUT = 5  # 5秒超时
 # 简单的用户验证（生产环境应使用数据库）
 USERS = {
     'admin': 'admin123',  # 用户名: 密码
-    'user': 'user123'
+    'user': 'user123',
+    'meng.liu@insgeek.com': '0K0AinKeljtA',
 }
 
 def token_required(f):
@@ -72,6 +74,54 @@ def token_required(f):
         
         return f(current_user, *args, **kwargs)
     
+    return decorated
+
+def permission_required(f):
+    """权限校验装饰器：
+    - 若资源未在RBAC表中配置，则视为公开资源，允许匿名访问；
+    - 若资源已配置，则需要JWT且校验用户角色是否获得该资源授权。
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        try:
+            path = request.path
+            method = request.method
+
+            # 判断是否为受控资源
+            protected = False
+            try:
+                protected = data_export_service.db_manager.is_request_protected(path, method)
+            except Exception:
+                protected = False
+
+            if not protected:
+                # 公开资源，允许匿名访问
+                return f('anonymous', *args, **kwargs)
+
+            # 受控资源，必须携带并校验JWT
+            token = request.headers.get('Authorization')
+            if not token:
+                return jsonify({'success': False, 'error': '缺少认证token'}), 401
+
+            try:
+                if token.startswith('Bearer '):
+                    token = token[7:]
+                data = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+                current_user = data['username']
+            except jwt.ExpiredSignatureError:
+                return jsonify({'success': False, 'error': 'Token已过期'}), 401
+            except jwt.InvalidTokenError:
+                return jsonify({'success': False, 'error': '无效的token'}), 401
+
+            # 授权校验
+            allowed = data_export_service.db_manager.check_user_access(current_user, path, method)
+            if not allowed:
+                return jsonify({'success': False, 'error': '权限不足'}), 403
+
+            return f(current_user, *args, **kwargs)
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
     return decorated
 
 def notify_scheduler(task_id: int, action: str = 'update'):
@@ -141,11 +191,46 @@ def notify_scheduler_reload_all():
     thread = threading.Thread(target=_notify, daemon=True)
     thread.start()
 
+# ==================== 系统健康检查 ====================
+
+@app.route('/api/status', methods=['GET'])
+def api_status():
+    """系统健康检查与基本信息"""
+    try:
+        # 配置与基本信息
+        cfg = data_export_service.config or {}
+        sys_db = cfg.get('system_database', {})
+        db_info = {
+            'type': sys_db.get('type'),
+            'host': sys_db.get('host'),
+            'port': sys_db.get('port'),
+            'database': sys_db.get('database'),
+        }
+
+        # 简单数据库可用性检查：统计资源数量
+        resources_count = None
+        try:
+            with data_export_service.db_manager.get_session() as session:
+                resources_count = session.query(Resource).count()
+        except Exception:
+            resources_count = -1
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'status': 'ok',
+                'db': db_info,
+                'protected_resources_count': resources_count,
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # ==================== 认证相关API ====================
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """用户登录"""
+    """用户登录（数据库校验）"""
     try:
         data = request.get_json()
         
@@ -158,11 +243,12 @@ def login():
         username = data['username']
         password = data['password']
         
-        # 验证用户名和密码
-        if username not in USERS or USERS[username] != password:
+        # 使用服务层校验数据库中的用户名与密码
+        result = data_export_service.verify_user_credentials(username, password)
+        if not result.get('success'):
             return jsonify({
                 'success': False,
-                'error': '用户名或密码错误'
+                'error': result.get('error', '用户名或密码错误')
             }), 401
         
         # 生成JWT token
@@ -201,10 +287,115 @@ def verify_token(current_user):
         }
     })
 
+# ==================== 用户管理相关API ====================
+
+@app.route('/api/users', methods=['POST'])
+@permission_required
+def create_user_api(current_user):
+    """创建用户（需登录，密码明文存储）"""
+    try:
+        data = request.get_json()
+        if not data or 'username' not in data or 'password' not in data:
+            return jsonify({'success': False, 'error': '请提供用户名和密码'}), 400
+
+        username = data.get('username')
+        password = data.get('password')
+        email = data.get('email')
+        role = data.get('role', 'user')
+
+        result = data_export_service.create_user(username=username, password=password, email=email, role=role)
+        if not result.get('success'):
+            return jsonify(result), 400
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/users', methods=['GET'])
+@permission_required
+def list_users_api(current_user):
+    """获取用户列表（分页）"""
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+        active_only = request.args.get('active_only') in ['1', 'true', 'True']
+
+        result = data_export_service.list_users(page=page, per_page=per_page, active_only=active_only)
+        if result.get('success'):
+            return jsonify({'success': True, 'data': result.get('data')})
+        else:
+            return jsonify({'success': False, 'error': result.get('error', '获取用户列表失败')}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/users/<int:user_id>', methods=['PUT'])
+@permission_required
+def update_user_api(current_user, user_id):
+    """更新用户信息（email, role, is_active, password）"""
+    try:
+        data = request.get_json() or {}
+        result = data_export_service.update_user(user_id, data)
+        status = 200 if result.get('success') else 400
+        # 对齐统一返回结构
+        if result.get('success'):
+            return jsonify({'success': True, 'data': result.get('user'), 'message': result.get('message')}), status
+        else:
+            return jsonify({'success': False, 'error': result.get('error', '用户更新失败')}), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# 用户-角色管理（多角色支持）
+
+@app.route('/api/users/<int:user_id>/roles', methods=['GET'])
+@permission_required
+def list_user_roles_api(current_user, user_id):
+    """列出用户绑定的角色列表"""
+    try:
+        roles = data_export_service.db_manager.list_user_roles(user_id)
+        return jsonify({
+            'success': True,
+            'data': [r.to_dict() for r in roles]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/users/<int:user_id>/roles', methods=['POST'])
+@permission_required
+def assign_user_role_api(current_user, user_id):
+    """为用户分配角色（支持 role_id 或 role_name）"""
+    try:
+        data = request.get_json() or {}
+        role_id = data.get('role_id')
+        role_name = data.get('role_name')
+
+        if not role_id and not role_name:
+            return jsonify({'success': False, 'error': '请提供 role_id 或 role_name'}), 400
+
+        if not role_id and role_name:
+            role = data_export_service.db_manager.get_role_by_name(role_name)
+            if not role:
+                return jsonify({'success': False, 'error': f'角色不存在: {role_name}'}), 404
+            role_id = role.id
+
+        ur = data_export_service.db_manager.assign_role_to_user(user_id=user_id, role_id=int(role_id))
+        return jsonify({'success': True, 'data': {'id': ur.id, 'user_id': ur.user_id, 'role_id': ur.role_id}}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/users/<int:user_id>/roles/<int:role_id>', methods=['DELETE'])
+@permission_required
+def revoke_user_role_api(current_user, user_id, role_id):
+    """撤销用户的角色绑定"""
+    try:
+        data_export_service.db_manager.revoke_role_from_user(user_id=user_id, role_id=role_id)
+        return jsonify({'success': True, 'message': '已撤销用户角色'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # ==================== 任务管理相关API ====================
 
 @app.route('/api/tasks', methods=['GET'])
-@token_required
+@permission_required
 def get_tasks(current_user):
     """获取任务列表"""
     try:
@@ -230,7 +421,7 @@ def get_tasks(current_user):
         }), 500
 
 @app.route('/api/tasks/<int:task_id>', methods=['GET'])
-@token_required
+@permission_required
 def get_task(current_user, task_id):
     """获取单个任务详情"""
     try:
@@ -253,7 +444,7 @@ def get_task(current_user, task_id):
         }), 500
 
 @app.route('/api/tasks', methods=['POST'])
-@token_required
+@permission_required
 def create_task(current_user):
     """创建新任务"""
     try:
@@ -292,7 +483,7 @@ def create_task(current_user):
         }), 500
 
 @app.route('/api/tasks/<int:task_id>', methods=['PUT'])
-@token_required
+@permission_required
 def update_task(current_user, task_id):
     """更新任务"""
     try:
@@ -327,7 +518,7 @@ def update_task(current_user, task_id):
         }), 500
 
 @app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
-@token_required
+@permission_required
 def delete_task(current_user, task_id):
     """删除任务"""
     try:
@@ -353,7 +544,7 @@ def delete_task(current_user, task_id):
         }), 500
 
 @app.route('/api/tasks/<int:task_id>/execute', methods=['POST'])
-@token_required
+@permission_required
 def execute_task(current_user, task_id):
     """手动执行任务"""
     try:
@@ -366,7 +557,7 @@ def execute_task(current_user, task_id):
         }), 500
 
 @app.route('/api/tasks/<int:task_id>/test', methods=['POST'])
-@token_required
+@permission_required
 def test_task(current_user, task_id):
     """测试任务"""
     try:
@@ -379,7 +570,7 @@ def test_task(current_user, task_id):
         }), 500
 
 @app.route('/api/scheduler/reload', methods=['POST'])
-@token_required
+@permission_required
 def reload_scheduler(current_user):
     """手动触发调度器重新加载所有任务"""
     try:
@@ -399,7 +590,7 @@ def reload_scheduler(current_user):
 # ==================== 执行日志相关API ====================
 
 @app.route('/api/logs', methods=['GET'])
-@token_required
+@permission_required
 def get_execution_logs(current_user):
     """获取执行日志"""
     try:
@@ -427,7 +618,7 @@ def get_execution_logs(current_user):
 # ==================== 数据源管理相关API ====================
 
 @app.route('/api/data-sources', methods=['GET'])
-@token_required
+@permission_required
 def get_data_sources(current_user):
     """获取数据源列表"""
     try:
@@ -445,7 +636,7 @@ def get_data_sources(current_user):
         }), 500
 
 @app.route('/api/data-sources', methods=['POST'])
-@token_required
+@permission_required
 def create_data_source(current_user):
     """创建数据源"""
     try:
@@ -478,7 +669,7 @@ def create_data_source(current_user):
         }), 500
 
 @app.route('/api/data-sources/<int:data_source_id>', methods=['GET'])
-@token_required
+@permission_required
 def get_data_source(current_user, data_source_id):
     """获取数据源详情"""
     try:
@@ -501,7 +692,7 @@ def get_data_source(current_user, data_source_id):
         }), 500
 
 @app.route('/api/data-sources/<int:data_source_id>', methods=['PUT'])
-@token_required
+@permission_required
 def update_data_source(current_user, data_source_id):
     """更新数据源"""
     try:
@@ -533,7 +724,7 @@ def update_data_source(current_user, data_source_id):
         }), 500
 
 @app.route('/api/data-sources/<int:data_source_id>', methods=['DELETE'])
-@token_required
+@permission_required
 def delete_data_source(current_user, data_source_id):
     """删除数据源"""
     try:
@@ -556,7 +747,7 @@ def delete_data_source(current_user, data_source_id):
         }), 500
 
 @app.route('/api/data-sources/<int:data_source_id>/test', methods=['POST'])
-@token_required
+@permission_required
 def test_data_source_connection(current_user, data_source_id):
     """测试数据源连接"""
     try:
@@ -569,7 +760,7 @@ def test_data_source_connection(current_user, data_source_id):
         }), 500
 
 @app.route('/api/data-sources/<int:data_source_id>/toggle', methods=['POST'])
-@token_required
+@permission_required
 def toggle_data_source_status(current_user, data_source_id):
     """切换数据源状态"""
     try:
@@ -593,7 +784,7 @@ def toggle_data_source_status(current_user, data_source_id):
         }), 500
 
 @app.route('/api/data-sources/refresh', methods=['POST'])
-@token_required
+@permission_required
 def refresh_data_sources(current_user):
     """刷新所有数据源到连接管理器"""
     try:
@@ -672,6 +863,168 @@ def download_file(filename):
         print(f"文件下载错误: {e}")
         print(f"错误详情: {error_details}")
         return jsonify({'error': str(e), 'details': error_details}), 500
+
+# ==================== RBAC 管理相关API ====================
+
+@app.route('/api/rbac/roles', methods=['GET'])
+@permission_required
+def rbac_list_roles(current_user):
+    try:
+        result = data_export_service.list_roles()
+        status = 200 if result.get('success') else 500
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rbac/roles', methods=['POST'])
+@permission_required
+def rbac_create_role(current_user):
+    try:
+        data = request.get_json() or {}
+        name = data.get('name')
+        description = data.get('description')
+        if not name:
+            return jsonify({'success': False, 'error': '请提供角色名称'}), 400
+        result = data_export_service.create_role(name=name, description=description)
+        status = 201 if result.get('success') else 400
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rbac/roles/<int:role_id>', methods=['PUT'])
+@permission_required
+def rbac_update_role(current_user, role_id):
+    try:
+        data = request.get_json() or {}
+        result = data_export_service.update_role(role_id, data)
+        status = 200 if result.get('success') else 400
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rbac/roles/<int:role_id>', methods=['DELETE'])
+@permission_required
+def rbac_delete_role(current_user, role_id):
+    try:
+        result = data_export_service.delete_role(role_id)
+        status = 200 if result.get('success') else 400
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rbac/resources', methods=['GET'])
+@permission_required
+def rbac_list_resources(current_user):
+    try:
+        result = data_export_service.list_resources()
+        status = 200 if result.get('success') else 500
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rbac/resources', methods=['POST'])
+@permission_required
+def rbac_create_resource(current_user):
+    try:
+        data = request.get_json() or {}
+        required = ['name', 'path']
+        if not all(k in data and data[k] for k in required):
+            return jsonify({'success': False, 'error': '请提供资源名称与路径'}), 400
+        result = data_export_service.create_resource(data)
+        status = 201 if result.get('success') else 400
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rbac/resources/<int:resource_id>', methods=['PUT'])
+@permission_required
+def rbac_update_resource(current_user, resource_id):
+    try:
+        data = request.get_json() or {}
+        result = data_export_service.update_resource(resource_id, data)
+        status = 200 if result.get('success') else 400
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rbac/resources/<int:resource_id>', methods=['DELETE'])
+@permission_required
+def rbac_delete_resource(current_user, resource_id):
+    try:
+        result = data_export_service.delete_resource(resource_id)
+        status = 200 if result.get('success') else 400
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rbac/authorize', methods=['POST'])
+@permission_required
+def rbac_authorize(current_user):
+    try:
+        data = request.get_json() or {}
+        role_id = data.get('role_id')
+        resource_id = data.get('resource_id')
+        if not role_id or not resource_id:
+            return jsonify({'success': False, 'error': '请提供role_id与resource_id'}), 400
+        result = data_export_service.grant_role_resource(role_id=role_id, resource_id=resource_id)
+        status = 200 if result.get('success') else 400
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rbac/revoke', methods=['POST'])
+@permission_required
+def rbac_revoke(current_user):
+    try:
+        data = request.get_json() or {}
+        role_id = data.get('role_id')
+        resource_id = data.get('resource_id')
+        if not role_id or not resource_id:
+            return jsonify({'success': False, 'error': '请提供role_id与resource_id'}), 400
+        result = data_export_service.revoke_role_resource(role_id=role_id, resource_id=resource_id)
+        status = 200 if result.get('success') else 400
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rbac/roles/<int:role_id>/resources', methods=['GET'])
+@permission_required
+def rbac_list_role_resources(current_user, role_id):
+    try:
+        result = data_export_service.get_role_resources(role_id)
+        status = 200 if result.get('success') else 400
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rbac/me/resources', methods=['GET'])
+@token_required
+def rbac_me_resources(current_user):
+    """返回当前登录用户的角色与可访问资源集合
+    使用token认证即可，无需资源注册，以便前端在登录后拉取权限。
+    """
+    try:
+        result = data_export_service.get_user_permissions(current_user)
+        status = 200 if result.get('success') else 400
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rbac/check', methods=['POST'])
+@token_required
+def rbac_check_access(current_user):
+    """检查当前用户对指定 path+method 是否拥有访问权限"""
+    try:
+        data = request.get_json() or {}
+        path = data.get('path')
+        method = data.get('method', 'GET')
+        if not path:
+            return jsonify({'success': False, 'error': '请提供 path'}), 400
+        result = data_export_service.check_user_access(current_user, path, method)
+        status = 200 if result.get('success') else 400
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/files/info/<path:filename>', methods=['GET'])
 def get_file_info(filename):

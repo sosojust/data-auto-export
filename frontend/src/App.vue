@@ -45,18 +45,31 @@
               <el-icon><House /></el-icon>
               <span>首页</span>
             </el-menu-item>
-            <el-menu-item index="/tasks">
+            <el-menu-item index="/tasks" v-if="authStore.hasPermission('/api/tasks','GET')">
               <el-icon><List /></el-icon>
               <span>任务管理</span>
             </el-menu-item>
-            <el-menu-item index="/logs">
+            <el-menu-item index="/logs" v-if="authStore.hasPermission('/api/logs','GET')">
               <el-icon><Document /></el-icon>
               <span>执行日志</span>
             </el-menu-item>
-            <el-menu-item index="/data-sources">
+            <el-menu-item index="/data-sources" v-if="authStore.hasPermission('/api/data-sources','GET')">
               <el-icon><Coin /></el-icon>
               <span>数据源</span>
             </el-menu-item>
+            <el-menu-item index="/users" v-if="authStore.hasPermission('/api/users','GET')">
+              <el-icon><User /></el-icon>
+              <span>用户管理</span>
+            </el-menu-item>
+            <el-menu-item index="/rbac/resources" v-if="authStore.hasPermission('/api/rbac/resources','GET')">
+              <el-icon><Lock /></el-icon>
+              <span>资源权限</span>
+            </el-menu-item>
+            <el-menu-item index="/rbac/roles" v-if="authStore.hasPermission('/api/rbac/roles','GET')">
+              <el-icon><User /></el-icon>
+              <span>角色管理</span>
+            </el-menu-item>
+            <!-- 已移除授权管理页面入口 -->
           </el-menu>
         </el-aside>
 
@@ -82,7 +95,9 @@ import {
   Coin,
   User,
   ArrowDown,
-  SwitchButton
+  SwitchButton,
+  Lock,
+  Key
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

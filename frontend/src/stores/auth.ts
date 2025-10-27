@@ -6,6 +6,8 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('token'))
   const username = ref<string | null>(localStorage.getItem('username'))
   const isAuthenticated = ref<boolean>(!!token.value)
+  const roles = ref<string[]>(JSON.parse(localStorage.getItem('roles') || '[]'))
+  const resources = ref<Array<{ id?: number; path: string; method: string | null; match_type: string }>>(JSON.parse(localStorage.getItem('resources') || '[]'))
 
   const setAuth = (newToken: string, newUsername: string) => {
     token.value = newToken
@@ -24,10 +26,14 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     username.value = null
     isAuthenticated.value = false
+    roles.value = []
+    resources.value = []
     
     // 清除localStorage
     localStorage.removeItem('token')
     localStorage.removeItem('username')
+    localStorage.removeItem('roles')
+    localStorage.removeItem('resources')
     
     // 清除API header
     delete api.defaults.headers.common['Authorization']
@@ -55,13 +61,46 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  const fetchPermissions = async (): Promise<void> => {
+    if (!isAuthenticated.value) return
+    try {
+      const resp = await api.get('/api/rbac/me/resources')
+      if (resp.data.success) {
+        roles.value = resp.data.roles || []
+        resources.value = resp.data.resources || []
+        localStorage.setItem('roles', JSON.stringify(roles.value))
+        localStorage.setItem('resources', JSON.stringify(resources.value))
+      }
+    } catch (e) {
+      // 静默失败，保留已有权限
+    }
+  }
+
+  const hasPermission = (path: string, method: string = 'GET'): boolean => {
+    // 资源未注册（公开资源）由后端兜底；前端只基于已授权资源判断
+    for (const r of resources.value) {
+      const mMatch = !r.method || r.method.toUpperCase() === method.toUpperCase()
+      if (!mMatch) continue
+      if (r.match_type === 'exact') {
+        if (r.path === path) return true
+      } else if (r.match_type === 'prefix') {
+        if (path.startsWith(r.path)) return true
+      }
+    }
+    return false
+  }
+
   return {
     token,
     username,
     isAuthenticated,
+    roles,
+    resources,
     setAuth,
     clearAuth,
     initAuth,
-    verifyToken
+    verifyToken,
+    fetchPermissions,
+    hasPermission
   }
 })

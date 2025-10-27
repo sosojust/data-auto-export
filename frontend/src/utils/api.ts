@@ -45,12 +45,18 @@ const setupInterceptors = (instance: any) => {
       return response
     },
     (error: any) => {
-      if (error.response?.status === 401) {
+      const status = error.response?.status
+      const reqUrl: string = error.config?.url || ''
+      if (status === 401) {
+        // 登录接口的401不跳转登录页，向上抛出以便页面提示错误
+        if (reqUrl.includes('/api/auth/login')) {
+          ElMessage.error(error.response?.data?.error || '用户名或密码错误')
+          return Promise.reject(error)
+        }
         // Token无效或过期，清除本地存储并跳转到登录页
         localStorage.removeItem('token')
         localStorage.removeItem('username')
         ElMessage.error('登录已过期，请重新登录')
-        // 跳转到登录页
         window.location.href = '/login'
       } else if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
         ElMessage.error('请求超时，请稍后重试')

@@ -25,6 +25,10 @@ from core.services.task_executor import TaskExecutor
 from core.models.task import ExportTask, TaskStatus
 from core.models.data_source import DataSource
 from core.models.execution_log import ExecutionLog, ExecutionStatus
+from core.models.user import User
+from core.models.resource import Resource
+from core.models.role import Role
+from core.models.role_resource import RoleResource
 
 from loguru import logger
 
@@ -424,7 +428,66 @@ class DataExportService:
         except Exception as e:
             logger.error(f"测试数据源连接失败: {e}")
             return {'success': False, 'error': str(e)}
-    
+
+    # ==================== 用户管理 ====================
+
+    def verify_user_credentials(self, username: str, password: str) -> Dict[str, Any]:
+        """校验用户登录凭证（明文密码）"""
+        try:
+            ok = self.db_manager.verify_user_credentials(username, password)
+            if not ok:
+                return {'success': False, 'error': '用户名或密码错误'}
+
+            user = self.db_manager.get_user_by_username(username)
+            if not user:
+                return {'success': False, 'error': '用户不存在'}
+
+            return {
+                'success': True,
+                'user': user.to_dict()
+            }
+        except Exception as e:
+            logger.error(f"用户凭证校验失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def create_user(self, username: str, password: str, email: Optional[str] = None, role: str = 'user') -> Dict[str, Any]:
+        """创建用户（明文密码存储）"""
+        try:
+            user = self.db_manager.create_user(username=username, password=password, email=email, role=role)
+            return {
+                'success': True,
+                'user': user.to_dict(),
+                'message': f'用户 "{user.username}" 创建成功'
+            }
+        except Exception as e:
+            logger.error(f"创建用户失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def update_user(self, user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
+        """更新用户信息（email, role, is_active, password）"""
+        try:
+            user = self.db_manager.update_user(user_id, data)
+            return {
+                'success': True,
+                'user': user.to_dict(),
+                'message': f'用户 "{user.username}" 更新成功'
+            }
+        except Exception as e:
+            logger.error(f"更新用户失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def list_users(self, page: int = 1, per_page: int = 20, active_only: bool = False) -> Dict[str, Any]:
+        """获取用户列表（包含多角色信息）"""
+        try:
+            result = self.db_manager.list_users(page=page, per_page=per_page, active_only=active_only)
+            return {
+                'success': True,
+                'data': result
+            }
+        except Exception as e:
+            logger.error(f"获取用户列表失败: {e}")
+            return {'success': False, 'error': str(e)}
+
     def refresh_data_sources(self) -> Dict[str, Any]:
         """刷新所有数据源到连接管理器"""
         try:
@@ -497,7 +560,233 @@ class DataExportService:
         except Exception as e:
             logger.error(f"切换数据源状态失败: {e}")
             return {'success': False, 'error': str(e)}
-    
+
+    # ==================== 角色权限（RBAC）管理 ====================
+
+    def list_roles(self) -> Dict[str, Any]:
+        """获取角色列表"""
+        try:
+            roles = self.db_manager.list_roles()
+            return {
+                'success': True,
+                'roles': [r.to_dict() for r in roles],
+                'total': len(roles)
+            }
+        except Exception as e:
+            logger.error(f"获取角色列表失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def create_role(self, name: str, description: Optional[str] = None) -> Dict[str, Any]:
+        """创建角色"""
+        try:
+            role = self.db_manager.create_role(name=name, description=description or '')
+            return {
+                'success': True,
+                'role': role.to_dict(),
+                'message': f'角色 "{role.name}" 创建成功'
+            }
+        except Exception as e:
+            logger.error(f"创建角色失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def update_role(self, role_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
+        """更新角色"""
+        try:
+            role = self.db_manager.update_role(role_id=role_id, data=data)
+            return {
+                'success': True,
+                'role': role.to_dict(),
+                'message': f'角色 "{role.name}" 更新成功'
+            }
+        except Exception as e:
+            logger.error(f"更新角色失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def delete_role(self, role_id: int) -> Dict[str, Any]:
+        """删除角色"""
+        try:
+            self.db_manager.delete_role(role_id)
+            return {
+                'success': True,
+                'message': f'角色 ID {role_id} 删除成功'
+            }
+        except Exception as e:
+            logger.error(f"删除角色失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def list_resources(self) -> Dict[str, Any]:
+        """获取资源列表"""
+        try:
+            resources = self.db_manager.list_resources()
+            return {
+                'success': True,
+                'resources': [r.to_dict() for r in resources],
+                'total': len(resources)
+            }
+        except Exception as e:
+            logger.error(f"获取资源列表失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def get_resource(self, resource_id: int) -> Dict[str, Any]:
+        """获取资源详情"""
+        try:
+            resource = self.db_manager.get_resource(resource_id)
+            if not resource:
+                return {'success': False, 'error': f'资源不存在: ID {resource_id}'}
+            return {
+                'success': True,
+                'resource': resource.to_dict()
+            }
+        except Exception as e:
+            logger.error(f"获取资源详情失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def create_resource(self, data: dict) -> Dict[str, Any]:
+        """创建资源"""
+        try:
+            resource = self.db_manager.create_resource(data)
+            return {
+                'success': True,
+                'resource': resource.to_dict(),
+                'message': f'资源 "{resource.name}" 创建成功'
+            }
+        except Exception as e:
+            logger.error(f"创建资源失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def update_resource(self, resource_id: int, data: dict) -> Dict[str, Any]:
+        """更新资源"""
+        try:
+            resource = self.db_manager.update_resource(resource_id, data)
+            return {
+                'success': True,
+                'resource': resource.to_dict(),
+                'message': f'资源 "{resource.name}" 更新成功'
+            }
+        except Exception as e:
+            logger.error(f"更新资源失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def delete_resource(self, resource_id: int) -> Dict[str, Any]:
+        """删除资源"""
+        try:
+            self.db_manager.delete_resource(resource_id)
+            return {
+                'success': True,
+                'message': f'资源 ID {resource_id} 删除成功'
+            }
+        except Exception as e:
+            logger.error(f"删除资源失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def grant_role_resource(self, role_id: int, resource_id: int) -> Dict[str, Any]:
+        """授予角色访问某资源"""
+        try:
+            rr = self.db_manager.grant_role_resource(role_id=role_id, resource_id=resource_id)
+            return {
+                'success': True,
+                'grant': rr.to_dict(),
+                'message': '授权成功'
+            }
+        except Exception as e:
+            logger.error(f"授权角色资源失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def revoke_role_resource(self, role_id: int, resource_id: int) -> Dict[str, Any]:
+        """撤销角色访问某资源"""
+        try:
+            self.db_manager.revoke_role_resource(role_id=role_id, resource_id=resource_id)
+            return {
+                'success': True,
+                'message': '撤销授权成功'
+            }
+        except Exception as e:
+            logger.error(f"撤销角色资源授权失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def get_role_resources(self, role_id: int) -> Dict[str, Any]:
+        """按角色列出已授权资源列表"""
+        try:
+            with self.db_manager.get_session() as session:
+                role = session.query(Role).filter(Role.id == role_id, Role.is_active == True).first()
+                if not role:
+                    return {'success': False, 'error': f'角色不存在或未启用: ID {role_id}'}
+
+                rr_list = session.query(RoleResource).filter(RoleResource.role_id == role_id).all()
+                resource_ids = [rr.resource_id for rr in rr_list]
+
+                resources: list[Resource] = []
+                if resource_ids:
+                    resources = session.query(Resource).filter(Resource.id.in_(resource_ids)).all()
+
+                return {
+                    'success': True,
+                    'role': role.to_dict(),
+                    'resources': [res.to_dict() for res in resources],
+                    'total': len(resources)
+                }
+        except Exception as e:
+            logger.error(f"获取角色授权资源失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def check_user_access(self, username: Optional[str], path: str, method: str) -> Dict[str, Any]:
+        """检查用户对指定请求是否有访问权限"""
+        try:
+            # 当未配置资源时，为公开资源
+            allowed = self.db_manager.check_user_access(username or '', path, method)
+            return {'success': True, 'allowed': allowed}
+        except Exception as e:
+            logger.error(f"检查用户访问权限失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def get_user_permissions(self, username: str) -> Dict[str, Any]:
+        """返回当前用户的角色与可访问资源集合
+        - roles: 该用户绑定的角色名称列表（含旧字段回退）
+        - resources: 该用户通过其角色授权可访问的受控资源列表（去重）
+        """
+        try:
+            with self.db_manager.get_session() as session:
+                # 查找用户
+                from core.models.user import User
+                from core.models.role import Role
+                from core.models.role_resource import RoleResource
+                from core.models.resource import Resource
+                from core.models.user_role import UserRole
+
+                user = session.query(User).filter(User.username == username).first()
+                if not user:
+                    return {'success': False, 'error': f'用户不存在: {username}'}
+
+                # 获取用户的角色（多角色 + 旧字段回退）
+                ur_role_ids = [ur.role_id for ur in session.query(UserRole).filter(UserRole.user_id == user.id).all()]
+                roles: list[Role] = []
+                if ur_role_ids:
+                    roles = session.query(Role).filter(Role.id.in_(ur_role_ids), Role.is_active == True).all()
+                elif user.role:
+                    fallback = session.query(Role).filter(Role.name == user.role, Role.is_active == True).first()
+                    roles = [fallback] if fallback else []
+
+                role_names = [r.name for r in roles]
+
+                # 计算可访问资源（该用户所有角色的并集授权）
+                accessible_resources: list[Resource] = []
+                if roles:
+                    rr_q = session.query(RoleResource).filter(RoleResource.role_id.in_([r.id for r in roles]))
+                    resource_ids = list(set([rr.resource_id for rr in rr_q.all()]))
+                    if resource_ids:
+                        accessible_resources = session.query(Resource).filter(Resource.id.in_(resource_ids), Resource.is_active == True).all()
+
+                return {
+                    'success': True,
+                    'username': username,
+                    'roles': role_names,
+                    'resources': [res.to_dict() for res in accessible_resources],
+                    'total_resources': len(accessible_resources)
+                }
+        except Exception as e:
+            logger.error(f"获取用户权限信息失败: {e}")
+            return {'success': False, 'error': str(e)}
+
     # ==================== 服务生命周期管理 ====================
     
     def start(self):

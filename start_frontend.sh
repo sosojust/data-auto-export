@@ -28,6 +28,9 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# 新增：守护模式标记
+DAEMON_MODE=0
+
 # 检查Node.js环境
 check_node_env() {
     if ! command -v node >/dev/null 2>&1; then
@@ -135,7 +138,11 @@ start_dev_server() {
     
     print_success "正在启动前端开发服务器..."
     print_info "访问地址: http://localhost:$PORT"
-    print_info "按 Ctrl+C 停止服务"
+    if [ $DAEMON_MODE -eq 1 ]; then
+        print_info "以后台守护模式运行，日志: logs/frontend_dev.log"
+    else
+        print_info "按 Ctrl+C 停止服务"
+    fi
     echo
     
     cd frontend
@@ -143,8 +150,16 @@ start_dev_server() {
     # 设置端口环境变量
     export PORT=$PORT
     
-    # 启动开发服务器
-    npm run dev
+    # 启动开发服务器（支持守护模式）
+    if [ $DAEMON_MODE -eq 1 ]; then
+        mkdir -p ../logs
+        nohup npm run dev -- --port $PORT > ../logs/frontend_dev.log 2>&1 &
+        DEV_PID=$!
+        print_success "开发服务器已后台启动 (PID: $DEV_PID)"
+        echo $DEV_PID > ../logs/frontend_dev.pid
+    else
+        npm run dev -- --port $PORT
+    fi
 }
 
 # 启动预览服务器
@@ -167,7 +182,11 @@ start_preview_server() {
     
     print_success "正在启动前端预览服务器..."
     print_info "访问地址: http://localhost:$PORT"
-    print_info "按 Ctrl+C 停止服务"
+    if [ $DAEMON_MODE -eq 1 ]; then
+        print_info "以后台守护模式运行，日志: logs/frontend_preview.log"
+    else
+        print_info "按 Ctrl+C 停止服务"
+    fi
     echo
     
     cd frontend
@@ -175,15 +194,27 @@ start_preview_server() {
     # 设置端口环境变量
     export PORT=$PORT
     
-    # 启动预览服务器
-    npm run preview -- --port $PORT
+    # 启动预览服务器（支持守护模式）
+    if [ $DAEMON_MODE -eq 1 ]; then
+        mkdir -p ../logs
+        nohup npm run preview -- --port $PORT > ../logs/frontend_preview.log 2>&1 &
+        PREVIEW_PID=$!
+        print_success "预览服务器已后台启动 (PID: $PREVIEW_PID)"
+        echo $PREVIEW_PID > ../logs/frontend_preview.pid
+    else
+        npm run preview -- --port $PORT
+    fi
 }
 
 # 主函数
 main() {
     local mode=${1:-dev}
+    local daemon_flag=${2:-}
+    if [ "$daemon_flag" = "--daemon" ]; then
+        DAEMON_MODE=1
+    fi
     
-    print_info "启动数据导出系统前端 ($mode 模式)..."
+    print_info "启动数据导出系统前端 ($mode 模式${DAEMON_MODE:+, 守护模式})..."
     
     # 检查环境
     check_node_env
@@ -221,16 +252,18 @@ show_help() {
     echo "  preview    构建并启动预览服务器"
     echo
     echo "选项:"
-    echo "  --help, -h 显示此帮助信息"
+    echo "  --help, -h  显示此帮助信息"
+    echo "  --daemon    后台守护运行，将忽略SIGHUP并输出到日志"
     echo
     echo "示例:"
-    echo "  $0         # 启动开发服务器"
-    echo "  $0 dev     # 启动开发服务器"
-    echo "  $0 build   # 构建生产版本"
-    echo "  $0 preview # 构建并预览"
+    echo "  $0                 # 启动开发服务器"
+    echo "  $0 dev             # 启动开发服务器"
+    echo "  $0 build           # 构建生产版本"
+    echo "  $0 preview         # 构建并预览"
+    echo "  $0 preview --daemon  # 构建并以后台模式预览"
     echo
-    echo "开发服务器地址: http://localhost:3000"
-    echo "预览服务器地址: http://localhost:4173"
+    echo "开发服务器默认端口: 3000"
+    echo "预览服务器默认端口: 3000 (可切换)"
     echo
 }
 
@@ -241,7 +274,7 @@ case "${1:-}" in
         exit 0
         ;;
     dev|development|build|preview)
-        main "$1"
+        main "$1" "$2"
         ;;
     "")
         main "dev"

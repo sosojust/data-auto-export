@@ -647,6 +647,14 @@ tail -f logs/frontend_dev.log
    ./start_cli.sh --daemon
    ```
 
+## 🤝 贡献指南
+
+1. Fork 项目
+2. 创建功能分支
+3. 提交更改
+4. 推送到分支
+5. 创建 Pull Request
+
 ## 📄 许可证
 
 本项目采用 MIT 许可证。

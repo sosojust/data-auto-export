@@ -20,14 +20,6 @@
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-content">
-            <div class="stat-number">{{ stats.data_sources }}</div>
-            <div class="stat-label">数据源</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
             <div class="stat-number">{{ stats.recent_success_rate }}</div>
             <div class="stat-label">最近成功率</div>
           </div>
@@ -63,7 +55,6 @@ import api from '../utils/api'
 const stats = ref({
   total_tasks: 0,
   active_tasks: 0,
-  data_sources: 0,
   recent_success_rate: '0%'
 })
 
@@ -79,12 +70,6 @@ const fetchStats = async () => {
     const allTasksResponse = await api.get('/api/tasks?per_page=1000') // 获取足够多的任务
     if (allTasksResponse.data.success) {
       stats.value.active_tasks = allTasksResponse.data.data.tasks.filter((task: any) => task.status === 'active').length
-    }
-    
-    // 获取数据源统计
-    const dataSourcesResponse = await api.get('/api/data-sources')
-    if (dataSourcesResponse.data.success) {
-      stats.value.data_sources = dataSourcesResponse.data.data.total
     }
     
     // 获取最近执行成功率（可以根据需要实现）

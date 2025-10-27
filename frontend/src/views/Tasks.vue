@@ -20,6 +20,7 @@
       <el-table :data="tasks" v-loading="loading" empty-text="暂无任务">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="任务名称" width="200" />
+        <el-table-column prop="created_by" label="创建人" width="120" />
         <el-table-column prop="data_source_name" label="数据源" width="150" />
         <el-table-column prop="execution_type_text" label="执行类型" width="120" />
         <el-table-column prop="status_text" label="状态" width="100">
